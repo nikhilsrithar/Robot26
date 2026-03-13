@@ -210,6 +210,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     try {
       var config = RobotConfig.fromGUISettings();
       
+      // This should not be changed
+      // Here is the link to documentation for pathplanner setup:
       AutoBuilder.configure(
       () -> getState().Pose, // Supplier of current robot pose
       this::resetPose, // Consumer for seeding pose against auto
@@ -231,29 +233,13 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
       () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red,
       this // Subsystem for requirements
       );
-     // autoBuilder.configure(
-     //      () -> RobotContainer.drivebase.getPose(), // Supplier of current robot pose
-     //      this::resetPose, // Consumer for seeding pose against auto
-     //      () -> getState().Speeds, // Supplier of current robot speeds
-     //      // Consumer of ChassisSpeeds and feedforwards to drive the robot
-     //      (speeds, feedforwards) -> setControl(
-     //          m_pathApplyRobotSpeeds.withSpeeds(speeds)
-     //              .withWheelForceFeedforwardsX(feedforwards.robotRelativeForcesXNewtons())
-     //              .withWheelForceFeedforwardsY(feedforwards.robotRelativeForcesYNewtons())),
-     //      new PPHolonomicDriveController(
-     //          // PID constants for translation
-     //          new PIDConstants(10, 0, 0),
-     //          // PID constants for rotation
-     //          new PIDConstants(7, 0, 0)),
-     //      config,
-     //      // Assume the path needs to be flipped for Red vs Blue, this is normally the
-     //      // case
-     //      () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red,
-     //      this // Subsystem for requirements
-      // );
     } catch (Exception ex) {
       DriverStation.reportError("Failed to load PathPlanner config and configure AutoBuilder", ex.getStackTrace());
     }
+  }
+
+  public ChassisSpeeds getSpeeds() {
+      return getSpeeds();
   }
 
   /**
@@ -291,7 +277,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
   @Override
   public void periodic() {
-
     /*
      * Periodically try to apply the operator perspective.
      * If we haven't applied the operator perspective before, then we should apply

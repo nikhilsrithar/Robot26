@@ -33,8 +33,6 @@ public final class Constants {
 	public static DriverStation.Alliance	 alliance;
 	public static int                        location, matchNumber;
 	public static String					 eventName, gameMessage;
-	    
-    public static String                     functionMarker = "-".repeat(30);
 
     public static final double  ROBOT_PERIOD_SEC = .02;
     public static final int     ROBOT_PERIOD_MS = 20;
@@ -171,16 +169,6 @@ public final class Constants {
 
     public static double FIELD_MIDDLE_Y = 4.021;
 
-    public static double ROBOT_THROTTLE_KP = 0.012;
-    public static double ROBOT_THROTTLE_KI = 0;
-    public static double ROBOT_THROTTLE_KI_MAX = 0;
-    public static double ROBOT_THROTTLE_KD = 0;
-
-    public static double ROBOT_STRAFE_KP = 0.012;
-    public static double ROBOT_STRAFE_KI = 0;
-    public static double ROBOT_STRAFE_KI_MAX = 0;
-    public static double ROBOT_STRAFE_KD = 0;
-
     public static double ROBOT_HEADING_KP = 0.02;
     public static double ROBOT_HEADING_KI = 0;
     public static double ROBOT_HEADING_KI_MAX = 0;
@@ -211,7 +199,7 @@ public final class Constants {
     // ---------------- Feedforward (Talon internal) ----------------
     // Units: Volts, Volts/(rps), Volts/(rps/s)
     public static final double FLYWHEEL_kS = 0.1;
-    public static final double FLYWHEEL_kV = 0.11;
+    public static final double FLYWHEEL_kV = 0.12;
     public static final double FLYWHEEL_kA = 0.05;
     // ---------------- PID (Velocity) ----------------
     public static final double FLYWHEEL_kP = 0.2;
@@ -237,7 +225,7 @@ public final class Constants {
     // PID constants for Intake
     public static final double INTAKE_kP = 0.8;
 
-    public static final int INFEED_DEFAULT_TARGET_RPM = 4000;
+    public static final int INFEED_DEFAULT_TARGET_RPM = 5500;
     // PID constants for Shooter Infeed
     public static final double INFEED_kP = 0.8;
 

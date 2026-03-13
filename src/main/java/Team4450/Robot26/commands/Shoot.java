@@ -4,7 +4,6 @@ import Team4450.Robot26.subsystems.Drivebase;
 import Team4450.Robot26.subsystems.Hopper;
 import Team4450.Robot26.subsystems.Shooter;
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class Shoot extends Command {
   private Shooter shooter;
@@ -21,6 +20,7 @@ public class Shoot extends Command {
     public void initialize() {
         shooter.enabledHood();
         shooter.startFlywheel();
+        drivebase.setX();
     }
 
     @Override
@@ -28,8 +28,6 @@ public class Shoot extends Command {
         if (this.shooter.flywheelAtSpeed()) {
             shooter.startInfeed();
             hopper.start();
-        } else {
-            shooter.stopInfeed();
         }
     }
 

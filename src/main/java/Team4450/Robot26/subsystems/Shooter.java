@@ -157,9 +157,7 @@ public class Shooter extends SubsystemBase {
 
         hoodMotorPosition = hoodLeft.getPosition().getValueAsDouble();
 
-        if (drivebase.willEnterTrench()) {
-            updateHoodPosition(0);
-        } else if (this.enabledHood) {
+        if (this.enabledHood) {
             updateHoodPosition(SmartDashboard.getNumber(Constants.ShooterKeys.HOOD_TARGET_POSITION, 0));
         } else {
             updateHoodPosition(0);
