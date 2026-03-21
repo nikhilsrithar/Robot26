@@ -3,11 +3,14 @@ package Team4450.Robot26.subsystems;
 import Team4450.Lib.Util;
 import Team4450.Robot26.Constants;
 import Team4450.Robot26.utility.RobotOrientation;
+import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.lang.Math;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import Team4450.Robot26.RobotContainer;
 
 public class VisionSubsystem extends SubsystemBase {
     // Info from: https://docs.limelightvision.io/docs/docs-limelight/pipeline-apriltag/apriltags
@@ -80,7 +83,7 @@ public class VisionSubsystem extends SubsystemBase {
             return;
         }
         // How to stpo this when disabled
-        boolean useLeftLimelight = true;
+        boolean useFrontLimelight = true;
         boolean useRightLimelight = true;
         // Get latest pose estimage from each camera
         
@@ -92,48 +95,50 @@ public class VisionSubsystem extends SubsystemBase {
         LimelightHelpers.PoseEstimate right_mt2 = LimelightHelpers.getBotPoseEstimate_wpiBlue(Constants.LIMELIGHT_RIGHT);
         // Pose2d right_mt2 = LimelightHelpers.getBotPose2d_wpiBlue(Constants.LIMELIGHT_RIGHT);
 
-        // If the angular velocity is greater than 720 degrees per second ignore the vision update
+        // If the angular velocity is greater than 120 degrees per second ignore the vision update
         //
         // IDK if this is yaw rate or what units this is in
-        if (Math.abs(drivebase.pigeonWrapper.pigeon.getAngularVelocityXDevice().getValueAsDouble()) > 720) {
+        if (Math.abs(drivebase.pigeonWrapper.pigeon.getAngularVelocityXDevice().getValueAsDouble()) > 120) {
             return;
         }
 
-        // Get rid of any result that says we are out of the field
-
-        // IDK what units the getX() return
-        // IDK what units the getY() return
-
+        // getX() return meters
+        // getY() return meters
 
         if (front_mt2 != null) {
             if (Math.abs(front_mt2.pose.getX()) > Constants.FIELD_MAX_X) {
-                useLeftLimelight = false;
+                useFrontLimelight = false;
             }
 
             if (Math.abs(front_mt2.pose.getY()) > Constants.FIELD_MAX_Y) {
-                useLeftLimelight = false;
+                useFrontLimelight = false;
             }
 
             double numTags = front_mt2.rawFiducials.length;
             for (LimelightHelpers.RawFiducial tag : front_mt2.rawFiducials) {
-                if (Math.abs(tag.txnc) > 20) { // TODO: Convert 20 to a constants value
+                if (Math.abs(tag.txnc) > 15) { // TODO: Convert 20 to a constants value
                     numTags--;
-                } else if (Math.abs(tag.tync) > 20) {
+                } else if (Math.abs(tag.tync) > 15) {
                     numTags--;
                 }
             }
 
-            SmartDashboard.putNumber("Front Limelight numTags", numTags);
+            // TODO: Convert to a constants value
             if (numTags < 2) {
-                useLeftLimelight = false;
+                useFrontLimelight = false;
             }
 
-            if (useLeftLimelight) {
-                SmartDashboard.putBoolean("Send Front Limelight info", true);
+            // TODO: Convert these to constants
+            if (Math.abs(drivebase.getXVelocity()) > 0.1 || Math.abs(drivebase.getYVelocity()) > 0.1 || Math.abs(drivebase.getRotVelocity()) > 0.1) {
+                useFrontLimelight = false;
+            }
+
+            if (useFrontLimelight) {
+                SmartDashboard.putBoolean(Constants.SmartDashboardKeys.SEND_FRONT_LIMELIGHT_INFO, true);
                 drivebase.addLimelightMeasurement(front_mt2.pose, front_mt2.timestampSeconds);
                 this.frontLimelightSee = true;
             } else {
-                SmartDashboard.putBoolean("Send Front Limelight info", false);
+                SmartDashboard.putBoolean(Constants.SmartDashboardKeys.SEND_FRONT_LIMELIGHT_INFO, false);
                 this.frontLimelightSee = false;
             }
         }
@@ -149,9 +154,9 @@ public class VisionSubsystem extends SubsystemBase {
 
             double numTags = right_mt2.rawFiducials.length;
             for (LimelightHelpers.RawFiducial tag : right_mt2.rawFiducials) {
-                if (Math.abs(tag.txnc) > 20) { // TODO: Convert 20 to a constants value
+                if (Math.abs(tag.txnc) > 15) { // TODO: Convert 20 to a constants value
                     numTags--;
-                } else if (Math.abs(tag.tync) > 20) {
+                } else if (Math.abs(tag.tync) > 15) {
                     numTags--;
                 }
             }
@@ -160,23 +165,27 @@ public class VisionSubsystem extends SubsystemBase {
                 useRightLimelight = false;
             }
 
+            if (Math.abs(drivebase.getXVelocity()) > 0.1 || Math.abs(drivebase.getYVelocity()) > 0.1 || Math.abs(drivebase.getRotVelocity()) > 0.1) {
+                useRightLimelight = false;
+            }
+
             if (useRightLimelight) {
-                SmartDashboard.putBoolean("Send Right Limelight info", true);
+                SmartDashboard.putBoolean(Constants.SmartDashboardKeys.SEND_RIGHT_LIMELIGHT_INFO, true);
                 drivebase.addLimelightMeasurement(right_mt2.pose, right_mt2.timestampSeconds);
                 this.rightLimelightSee = true;
             } else {
-                SmartDashboard.putBoolean("Send Right Limelight info", false);
+                SmartDashboard.putBoolean(Constants.SmartDashboardKeys.SEND_RIGHT_LIMELIGHT_INFO, false);
                 this.rightLimelightSee = false;
             }
         }
+    }
 
-        // Get rid of the result if the yaw of the resulting pose is impossible
-        //
-        // I think the yaw is between -180 and 180 instead of 0 - 360
-        // if (front_mt2.pose.getRotation().getDegrees() < 0 || front_mt2.pose.getRotation().getDegrees() > 360 || right_mt2.pose.getRotation().getDegrees() < 0 || right_mt2.pose.getRotation().getDegrees() > 360) {
-        //     return;
-        // }
-        
+    public void resetYaw() {
+        if (Constants.alliance == Alliance.Blue) {
+            RobotContainer.drivebase.pigeonWrapper.setCurrentYaw(0);
+        } else {
+            RobotContainer.drivebase.pigeonWrapper.setCurrentYaw(180);
+        }
     }
 
     public void zeroLimelightIMU(RobotOrientation rO) { // Set to IMU mode 0 to diable the internal limelight IMU

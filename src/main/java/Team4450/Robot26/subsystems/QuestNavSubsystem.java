@@ -18,7 +18,7 @@ public class QuestNavSubsystem extends SubsystemBase {
     private boolean hasQuest;
     private QuestNav questNav;
     private Transform3d ROBOT_TO_QUEST = new Transform3d(Constants.ROBOT_TO_QUEST.getX(), Constants.ROBOT_TO_QUEST.getY(), Constants.ROBOT_TO_QUEST.getZ(), Constants.ROBOT_TO_QUEST.getRotation());
-    
+
     final Pose3d nullPose = new Pose3d(-1, -1, -1, Rotation3d.kZero);
     final Pose2d nullPose2d = new Pose2d(-1, -1, Rotation2d.kZero);
     final Pose3d zeroPose = new Pose3d(0, 0, 0, Rotation3d.kZero);
@@ -98,16 +98,16 @@ public class QuestNavSubsystem extends SubsystemBase {
         if (questNav.isConnected()) {
             hasQuest = true;
             // If the x or y difference from the robots current pose to the limelight estimate pose update the current quest estimate for the position
-            SmartDashboard.putBoolean("Quest Connected", true);
+            SmartDashboard.putBoolean(Constants.SmartDashboardKeys.QUEST_CONNECTED, true);
             // 5000 miliseconds is 5 seconds
             if (System.currentTimeMillis() - this.lastResetTime > 1500) {
                 if (RobotContainer.visionSubsystem.frontLimelightSee || RobotContainer.visionSubsystem.rightLimelightSee) { // One of the limelight must be seeing tags
                     if (Math.abs(drivebase.getPose().getX() - drivebase.limelightPoseEstimate.getX()) > Constants.LIMELIGHT_QUEST_ERROR_AMOUNT_METERS || Math.abs(drivebase.getPose().getX() - drivebase.limelightPoseEstimate.getY()) > Constants.LIMELIGHT_QUEST_ERROR_AMOUNT_METERS) {
-                        Pose3d limelightEstimatePose = new Pose3d(drivebase.limelightPoseEstimate);
-                        resetQuestOdometry(limelightEstimatePose);
+                        // Setting the current yaw seems a little bad and might cause problems
+                        drivebase.pigeonWrapper.setCurrentYaw(drivebase.limelightPoseEstimate.getRotation().getDegrees());
                         drivebase.limelightPoseEstimate = nullPose2d;
                         this.lastResetTime = System.currentTimeMillis();
-                    }
+                        }
                 } else {
                     this.lastResetTime = System.currentTimeMillis();
                 }
@@ -116,13 +116,13 @@ public class QuestNavSubsystem extends SubsystemBase {
             hasQuest = false;
             limelightWarnLogger.update("The Questnav is not found, force updating pose with limelight pose!");
             drivebase.forceAddLimelightMeasurement(drivebase.limelightPoseEstimate);
-            SmartDashboard.putBoolean("Quest Connected", false);
+            SmartDashboard.putBoolean(Constants.SmartDashboardKeys.QUEST_CONNECTED, false);
         }
 
         if (questNav.isTracking()) {
-            SmartDashboard.putBoolean("Quest Tracking", true);
+            SmartDashboard.putBoolean(Constants.SmartDashboardKeys.QUEST_TRACKING, true);
         } else {
-            SmartDashboard.putBoolean("Quest Tracking", false);
+            SmartDashboard.putBoolean(Constants.SmartDashboardKeys.QUEST_TRACKING, false);
         }
 
         questTestLogger.update("Quest periodic");

@@ -2,9 +2,11 @@ package Team4450.Robot26;
 
 import static Team4450.Robot26.Constants.*;
 
+import com.ctre.phoenix6.SignalLogger;
 import com.fasterxml.jackson.databind.util.Named;
 import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.commands.FollowPathCommand;
+import com.pathplanner.lib.auto.AutoBuilder;
 
 import Team4450.Robot26.commands.DisableHubTracking;
 import Team4450.Robot26.commands.DriveCommand;
@@ -12,7 +14,6 @@ import Team4450.Robot26.commands.EnableHubTracking;
 import Team4450.Robot26.commands.Shoot;
 import Team4450.Robot26.commands.ShootWithX;
 import Team4450.Robot26.commands.StartIntake;
-import Team4450.Robot26.commands.StopIntake;
 import Team4450.Robot26.commands.StopShoot;
 import Team4450.Robot26.commands.StopAuto;
 import Team4450.Robot26.commands.IntakeUp;
@@ -30,7 +31,6 @@ import Team4450.Robot26.commands.DriveCommand;
 import Team4450.Robot26.subsystems.Drivebase;
 import Team4450.Robot26.subsystems.QuestNavSubsystem;
 import Team4450.Robot26.subsystems.ShuffleBoard;
-import Team4450.Robot26.subsystems.TestSubsystem;
 import Team4450.Robot26.subsystems.VisionSubsystem;
 import Team4450.Robot26.subsystems.Hopper;
 import edu.wpi.first.math.controller.PIDController;
@@ -44,9 +44,11 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.StartEndCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 
 /**
  * This class is where the bulk of the robot should be declared. Since
@@ -74,6 +76,10 @@ public class RobotContainer {
   // public TestSubsystem testSubsystem;
 
   public static Hopper hopper = new Hopper();
+
+  public static boolean inTestMode = false;
+
+  private final SendableChooser<Command> autoChooser;
 
   // Subsystem Default Commands.
 
@@ -164,10 +170,10 @@ public class RobotContainer {
     shooter = new Shooter(drivebase);
 
     headingPID = new PIDController(Constants.ROBOT_HEADING_KP, Constants.ROBOT_HEADING_KI, Constants.ROBOT_HEADING_KD);
-    SmartDashboard.putNumber("Heading P", Constants.ROBOT_HEADING_KP);
-    SmartDashboard.putNumber("Heading I", Constants.ROBOT_HEADING_KI);
-    SmartDashboard.putNumber("Heading D", Constants.ROBOT_HEADING_KD);
-    SmartDashboard.putBoolean("Heading PID Toggle", Constants.HUB_TRACKING);
+    SmartDashboard.putNumber(Constants.SmartDashboardKeys.HEADING_P, Constants.ROBOT_HEADING_KP);
+    SmartDashboard.putNumber(Constants.SmartDashboardKeys.HEADING_D, Constants.ROBOT_HEADING_KI);
+    SmartDashboard.putNumber(Constants.SmartDashboardKeys.HEADING_I, Constants.ROBOT_HEADING_KD);
+    SmartDashboard.putBoolean(Constants.SmartDashboardKeys.HEADING_PID_TOGGLE, Constants.HUB_TRACKING);
 
     // Create any persistent commands.
 
@@ -179,8 +185,7 @@ public class RobotContainer {
     NamedCommands.registerCommand("intakeUp", new IntakeUp(intake));
     NamedCommands.registerCommand("enableHubTracking", new EnableHubTracking(drivebase, headingPID));
     NamedCommands.registerCommand("disableHubTracking", new DisableHubTracking(drivebase));
-    NamedCommands.registerCommand("startIntake", new StartIntake(intake));
-    NamedCommands.registerCommand("stopIntake", new StopIntake(intake));
+    NamedCommands.registerCommand("intake", new StartIntake(intake));
     NamedCommands.registerCommand("shoot", new Shoot(drivebase, shooter, hopper));
     NamedCommands.registerCommand("stopShooter", new StopShoot(shooter, hopper));
     NamedCommands.registerCommand("end", new StopAuto(drivebase));
@@ -238,12 +243,9 @@ public class RobotContainer {
         () -> driverController.getLeftY(),
         driverController.getLeftXDS(),
         driverController.getRightXDS(),
-        driverController.getRightYDS(),
-        driverController, headingPID);
+        driverController.getRightYDS(), headingPID);
 
     drivebase.setDefaultCommand(driveCommand);
-
-    SmartDashboard.putNumber("Test Motor Power", 0);
 
     monitorPowerThread = MonitorPower.getInstance();
     monitorPowerThread.start();
@@ -261,7 +263,8 @@ public class RobotContainer {
     }).start();
 
     // Configure autonomous routines and send to dashboard.
-    setAutoChoices();
+    autoChooser = AutoBuilder.buildAutoChooser();
+    SmartDashboard.putData("Auto Chooser", autoChooser);
 
     // Configure the button bindings.
     configureButtonBindings();
@@ -278,8 +281,10 @@ public class RobotContainer {
   private void configureButtonBindings() {
     // ------- Driver controller buttons -------------
 
-    // For simple functions, instead of creating commands, we can call convenience functions on
-    // the target subsystem from an InstantCommand. It can be tricky deciding what functions
+    // For simple functions, instead of creating commands, we can call convenience
+    // functions on
+    // the target subsystem from an InstantCommand. It can be tricky deciding what
+    // functions
     // should be an aspect of the subsystem and what functions should be in
     // Commands...
 
@@ -300,13 +305,9 @@ public class RobotContainer {
           utilityController.setRumble(RumbleType.kBothRumble, 0);
         }));
 
-    // Toggle slow-mode
-    new Trigger(() -> driverController.getLeftBumperButton()) // Rich
-        .onChange(new InstantCommand(drivebase::toggleSlowMode));
-
     // Reset field orientation (direction).
-    new Trigger(() -> driverController.getPOV() == 180) // D-pad down Cole
-        .onTrue(new InstantCommand(drivebase::resetFieldOrientation));
+    // new Trigger(() -> driverController.getPOV() == 180) // D-pad down Cole
+    // .onTrue(new InstantCommand(drivebase::resetFieldOrientation));
 
     // Toggle field-oriented driving mode.
     // new Trigger(() -> driverController.getAButton()) // Rich
@@ -326,20 +327,32 @@ public class RobotContainer {
     // new Trigger(() -> driverController.getBButton()) // Rich
     // .onTrue(new InstantCommand(driveBase::toggleNeutralMode));
 
+    // Toggle slow-mode
     // Right D-Pad button sets X pattern to stop movement.
-    new Trigger(() -> driverController.getPOV() == 90) // Rich
+    
+    new Trigger(() -> driverController.getLeftBumperButton()) // Rich
+        .onChange(new InstantCommand(drivebase::toggleSlowMode));
+
+    new Trigger(() -> driverController.getPOV() == 90) // Rich // Right D-pad
         .onTrue(new InstantCommand(drivebase::setX));
 
     new Trigger(() -> driverController.getPOV() == 0) // Up D-pad
-        .onTrue(new InstantCommand(shooter::toggleDisableAutomaticDistance));
+        .onTrue(new InstantCommand(shooter::toggleManualDistanceOne))
+        .onTrue(new InstantCommand(shooter::disableManualDistanceTwo))
+        .onTrue(new InstantCommand(shooter::disableManualDistanceThree));
 
-    new Trigger(() -> driverController.getPOV() == 270)
-        .onTrue(new InstantCommand(shooter::toggleDisableAutomaticDistanceTwo));
+    new Trigger(() -> driverController.getPOV() == 180) // Down D-pad
+        .onTrue(new InstantCommand(shooter::toggleManaualDistanceThree))
+        .onTrue(new InstantCommand(shooter::disableManualDistanceOne))
+        .onTrue(new InstantCommand(shooter::disableManualDistanceTwo));
 
-    // -------- Utility controller buttons ----------
+    new Trigger(() -> driverController.getPOV() == 270) // Left D-pad
+        .onTrue(new InstantCommand(shooter::toggleManualDistanceTwo))
+        .onTrue(new InstantCommand(shooter::disableManualDistanceOne))
+        .onTrue(new InstantCommand(shooter::disableManualDistanceThree));
     
     new Trigger(() -> driverController.getRightBumperButton())
-        .toggleOnTrue(new InstantCommand(intake::togglePivit));
+        .onTrue(new InstantCommand(intake::togglePivit));
 
     new Trigger(() -> driverController.getLeftTrigger())
         .whileTrue(new ShootWithX(drivebase, shooter, hopper));
@@ -349,10 +362,12 @@ public class RobotContainer {
         .onFalse(new InstantCommand(shooter::stopInfeed));
 
     new Trigger(() -> driverController.getAButton())
-        .onTrue(new InstantCommand(intake::startIntake));
+        .onTrue(new InstantCommand(intake::startIntake))
+        .onFalse(new InstantCommand(intake::stopIntake));
 
     new Trigger(() -> driverController.getBButton())
-        .onTrue(new InstantCommand(intake::stopIntake));
+        .onTrue(new InstantCommand(visionSubsystem::resetYaw))
+        .onTrue(new InstantCommand(drivebase::resetFieldOrientation));
 
     new Trigger(() -> driverController.getYButton())
         .onTrue(new InstantCommand(shooter::reverseInfeed))
@@ -376,7 +391,7 @@ public class RobotContainer {
   // }
 
   // public static String getAutonomousCommandName() {
-  //   return autonomousCommandName;
+  // return autonomousCommandName;
   // }
 
   // Configure SendableChooser (drop down list on dashboard) with auto program
@@ -387,6 +402,10 @@ public class RobotContainer {
     // autoChooser = AutoBuilder.buildAutoChooser();
 
     // SmartDashboard.putData("Auto Program", autoChooser);
+  }
+
+  public Command getAutonomousCommand() {
+    return autoChooser.getSelected();
   }
 
   /**

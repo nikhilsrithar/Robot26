@@ -1,7 +1,6 @@
 package Team4450.Robot26.commands;
 
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import java.util.function.DoubleSupplier;
 import edu.wpi.first.math.controller.PIDController;
@@ -11,67 +10,58 @@ import Team4450.Lib.Util;
 import Team4450.Robot26.Constants;
 import Team4450.Robot26.subsystems.Drivebase;
 import static Team4450.Robot26.Constants.*;
-import Team4450.Robot26.utility.ConsoleEveryX;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class DriveCommand extends Command {
-  private final Drivebase drivebase;
+    private final Drivebase drivebase;
 
-  private final DoubleSupplier throttleSupplier;
-  private final DoubleSupplier strafeSupplier;
-  private final DoubleSupplier rotationXSupplier;
-  private final DoubleSupplier rotationYSupplier;
-  private final XboxController controller;
+    private final DoubleSupplier throttleSupplier;
+    private final DoubleSupplier strafeSupplier;
+    private final DoubleSupplier rotationXSupplier;
+    private final DoubleSupplier rotationYSupplier;
+    public final PIDController headingPID;
 
-  public final PIDController headingPID;
+    public DriveCommand(Drivebase driveBase,
+            DoubleSupplier throttleSupplier,
+            DoubleSupplier strafeSupplier,
+            DoubleSupplier rotationXSupplier,
+            DoubleSupplier rotationYSupplier,
+            PIDController headingPID) {
+        Util.consoleLog();
 
-  private double delayCounter;
+        this.drivebase = driveBase;
+        this.throttleSupplier = throttleSupplier;
+        this.strafeSupplier = strafeSupplier;
+        this.rotationXSupplier = rotationXSupplier;
+        this.rotationYSupplier = rotationYSupplier;
+        this.headingPID = headingPID;
+        headingPID.setIntegratorRange(-ROBOT_HEADING_KI_MAX, ROBOT_HEADING_KI_MAX);
+        headingPID.enableContinuousInput(-180, 180);
+        headingPID.setTolerance(ROBOT_HEADING_TOLERANCE_DEG);
 
-  public DriveCommand(Drivebase driveBase,
-      DoubleSupplier throttleSupplier,
-      DoubleSupplier strafeSupplier,
-      DoubleSupplier rotationXSupplier,
-      DoubleSupplier rotationYSupplier,
-      XboxController controller, PIDController headingPID) {
-    Util.consoleLog();
+        addRequirements(driveBase);
+    }
 
-    this.drivebase = driveBase;
-    this.throttleSupplier = throttleSupplier;
-    this.strafeSupplier = strafeSupplier;
-    this.rotationXSupplier = rotationXSupplier;
-    this.rotationYSupplier = rotationYSupplier;
-    this.controller = controller;
-    this.headingPID = headingPID;
-    headingPID.setIntegratorRange(-ROBOT_HEADING_KI_MAX, ROBOT_HEADING_KI_MAX);
-    headingPID.enableContinuousInput(-180, 180);
-    headingPID.setTolerance(ROBOT_HEADING_TOLERANCE_DEG);
+    @Override
+    public void initialize() {
+        Util.consoleLog();
+    }
 
-    addRequirements(driveBase);
-  }
+    @Override
+    public void execute() {
+        // This is the default command for the Drivebase. When running in autonmous, the
+        // auto commands
+        // require Drivebase, which preempts the default Drivebase command. However, if
+        // our auto code ends
+        // before end of auto period, then this drive command resumes and is feeding
+        // drivebase during remainder
+        // of auto period. This was not an issue until the joystick drift problems
+        // arose, so the resumption of a
+        // driving command during auto had the robot driving randomly after our auto
+        // program completed. The if
+        // statment below prevents this.
 
-  @Override
-  public void initialize() {
-    Util.consoleLog();
-  }
-
-  @Override
-  public void execute() {
-    // This is the default command for the Drivebase. When running in autonmous, the
-    // auto commands
-    // require Drivebase, which preempts the default Drivebase command. However, if
-    // our auto code ends
-    // before end of auto period, then this drive command resumes and is feeding
-    // drivebase during remainder
-    // of auto period. This was not an issue until the joystick drift problems
-    // arose, so the resumption of a
-    // driving command during auto had the robot driving randomly after our auto
-    // program completed. The if
-    // statment below prevents this.
-
-    if (robot.isAutonomous())
-      return;
-
-        if (Constants.HUB_TRACKING && (SmartDashboard.putBoolean("Send Front Limelight info", true) || SmartDashboard.putBoolean("Send Right Limelight info", true))) {
+        if (robot.isAutonomous()) return; // We do not want to run the drive command if we are in auto
 
         // This finds where the correct hub position is
         Pose2d hubPosition;
@@ -80,82 +70,104 @@ public class DriveCommand extends Command {
         } else {
             hubPosition = new Pose2d(HUB_RED_WELDED_POSE.getX(), HUB_RED_WELDED_POSE.getY(), Rotation2d.kZero);
         }
-        
+
         double targetHeading;
-        
+
         // Decides where to track
         // If both inputs are zero and the alliance is blue then
-        if (rotationXSupplier.getAsDouble() == 0 && rotationYSupplier.getAsDouble() == 0 && alliance == DriverStation.Alliance.Blue) {
-            delayCounter = 0;
+        Pose2d drivebasePose = drivebase.getODPose();
+        if (Math.abs(rotationXSupplier.getAsDouble()) <= 0.2 && Math.abs(rotationYSupplier.getAsDouble()) <= 0.2 && alliance == DriverStation.Alliance.Blue) {
             // Checks if robot is currently in the Alliance Zone then aims at the hub
-            if (drivebase.getPose().getX() < NEUTRAL_BLUE_ZONE_BARRIER_X) {
-                targetHeading = drivebase.getAngleToAim(drivebase.getPoseToAim(hubPosition));
+            if (drivebasePose.getX() < NEUTRAL_BLUE_ZONE_BARRIER_X) {
+                targetHeading = drivebase.getAngleToAim(drivebasePose, hubPosition);
             } else {
                 // Checks what side the robot is on, and aims at the nearest ferrying target point predefined in Constants
-                if (drivebase.getPose().getY() < FIELD_MIDDLE_Y) {
-                    targetHeading = drivebase.getAngleToAim(drivebase.getPoseToAim(FERRY_BLUE_OUTPOST_CORNER));
+                if (drivebasePose.getY() < FIELD_MIDDLE_Y) {
+                    targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_BLUE_OUTPOST_CORNER);
                 } else {
-                    targetHeading = drivebase.getAngleToAim(drivebase.getPoseToAim(FERRY_BLUE_BLANK_CORNER));
+                    targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_BLUE_BLANK_CORNER);
                 }
             }
             // This does the same thing but for the red alliance
-        } else if (rotationXSupplier.getAsDouble() == 0 && rotationYSupplier.getAsDouble() == 0 && alliance == DriverStation.Alliance.Red) {
-            if (drivebase.getPose().getX() > NEUTRAL_RED_ZONE_BARRIER_X) {
-                targetHeading = drivebase.getAngleToAim(hubPosition);
+        } else if (Math.abs(rotationXSupplier.getAsDouble()) <= 0.2 && Math.abs(rotationYSupplier.getAsDouble()) <= 0.2 && alliance == DriverStation.Alliance.Red) {
+            if (drivebasePose.getX() > NEUTRAL_RED_ZONE_BARRIER_X) {
+                targetHeading = drivebase.getAngleToAim(drivebasePose, hubPosition);
             } else {
-                if (drivebase.getPose().getY() < FIELD_MIDDLE_Y) {
-                    targetHeading = drivebase.getAngleToAim(drivebase.getPoseToAim(FERRY_RED_BLANK_CORNER));
+                if (drivebasePose.getY() < FIELD_MIDDLE_Y) {
+                    targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_RED_BLANK_CORNER);
                 } else {
-                    targetHeading = drivebase.getAngleToAim(drivebase.getPoseToAim(FERRY_RED_OUTPOST_CORNER));
+                    targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_RED_OUTPOST_CORNER);
                 }
             }
-            // If there IS input, set the target heading to where the joystick si facing in relation to the driver
+            // If there IS input, set the target heading to where the joystick is facing in relation to the driver
         } else {
-            targetHeading = -Math.toDegrees(Math.atan2(rotationYSupplier.getAsDouble(), rotationXSupplier.getAsDouble())) - 90;
+            // targetHeading = -Math.toDegrees(Math.atan2(rotationYSupplier.getAsDouble(), rotationXSupplier.getAsDouble())) - 90;
+            targetHeading = drivebase.getAngleToAim(drivebasePose, hubPosition);
         }
-        
-        
-        SmartDashboard.putNumber("Target Heading", targetHeading);
 
-      double error = -targetHeading + Math.toDegrees(drivebase.getPose().getRotation().getDegrees());
+        targetHeading = normalizeAngle(targetHeading);
+        SmartDashboard.putNumber(Constants.SmartDashboardKeys.TARGET_HEADING, targetHeading);
 
-      SmartDashboard.putNumber("Heading Error", error);
+        double drivebaseYaw = drivebase.getODPose().getRotation().getDegrees();
+        SmartDashboard.putNumber("Heading Error", drivebaseYaw - targetHeading);
 
-      // Uses a PID and the previous assigned target heading to rotate there
-      double rotation = -headingPID.calculate(-Math.toDegrees(drivebase.getPose().getRotation().getDegrees()),
-          -targetHeading);
-      double throttle = throttleSupplier.getAsDouble();
-      double strafe = strafeSupplier.getAsDouble();
+        if (Constants.HUB_TRACKING) {
+            // Uses a PID and the previous assigned target heading to rotate there
+            double rotation = headingPID.calculate(drivebaseYaw, targetHeading);
+            SmartDashboard.putNumber(Constants.SmartDashboardKeys.HEADING_PID_OUTPUT, rotation);
+            double throttle = throttleSupplier.getAsDouble();
+            double strafe = strafeSupplier.getAsDouble();
 
-      throttle = Util.squareInput(throttle);
-      strafe = Util.squareInput(strafe);
+            throttle = Util.squareInput(throttle);
+            strafe = Util.squareInput(strafe);
 
-      headingPID.setP(SmartDashboard.getNumber("Heading P", Constants.ROBOT_HEADING_KP));
-      headingPID.setI(SmartDashboard.getNumber("Heading I", Constants.ROBOT_HEADING_KI));
-      headingPID.setD(SmartDashboard.getNumber("Heading D", Constants.ROBOT_HEADING_KD));
+            headingPID.setP(SmartDashboard.getNumber(Constants.SmartDashboardKeys.HEADING_P, Constants.ROBOT_HEADING_KP));
+            headingPID.setI(SmartDashboard.getNumber(Constants.SmartDashboardKeys.HEADING_I, Constants.ROBOT_HEADING_KI));
+            headingPID.setD(SmartDashboard.getNumber(Constants.SmartDashboardKeys.HEADING_D, Constants.ROBOT_HEADING_KD));
 
-      drivebase.drive(throttle, strafe, rotation);
+            drivebase.drive(throttle, strafe, rotation);
+            return;
+        } else {
+            double rotation = rotationXSupplier.getAsDouble();
+            double throttle = throttleSupplier.getAsDouble();
+            double strafe = strafeSupplier.getAsDouble();
 
-      return;
+            // Squaring input is one way to ramp JS inputs to reduce sensitivity.
+            // Please do not square the headingPID
+
+            throttle = Util.squareInput(throttle);
+            strafe = Util.squareInput(strafe);
+            // rotation = Util.squareInput(rotation);
+            // rotation = Math.pow(rotation, 5);
+
+            drivebase.drive(throttle, strafe, rotation);
+            return;
+        }
     }
 
-    double rotation = rotationXSupplier.getAsDouble();
-    double throttle = throttleSupplier.getAsDouble();
-    double strafe = strafeSupplier.getAsDouble();
+    @Override
+    public void end(boolean interrupted) {
+        Util.consoleLog("interrupted=%b", interrupted);
+    }
 
-    // Squaring input is one way to ramp JS inputs to reduce sensitivity.
-    // Please do not square the headingPID
+    public double normalizeAngle(double angle) {
+        if (angle >= -180 && angle < 180) {
+            return angle;
+        }
 
-    throttle = Util.squareInput(throttle);
-    strafe = Util.squareInput(strafe);
-    // rotation = Util.squareInput(rotation);
-    // rotation = Math.pow(rotation, 5);
-    //
-    drivebase.drive(throttle, strafe, rotation);
-  }
+        // Normalize the angle to the range [-360, 360).
+        double normalizedAngle = angle % 360;
 
-  @Override
-  public void end(boolean interrupted) {
-    Util.consoleLog("interrupted=%b", interrupted);
-  }
+        // If the result was negative, shift it to the range [0, 360).
+        if (normalizedAngle < 0) {
+            normalizedAngle += 360;
+        }
+
+        // If the angle is in the range [180, 360), shift it to [-180, 0).
+        if (normalizedAngle >= 180) {
+            normalizedAngle -= 360;
+        }
+
+        return normalizedAngle;
+    }
 }

@@ -3,29 +3,29 @@
   "waypoints": [
     {
       "anchor": {
-        "x": 3.55907327586207,
-        "y": 4.035
+        "x": 2.7869504310344833,
+        "y": 7.621950431034483
       },
       "prevControl": null,
       "nextControl": {
-        "x": 3.2753923845329496,
-        "y": 4.033539448731545
+        "x": 2.7869504310344833,
+        "y": 7.084396551724137
       },
       "isLocked": false,
-      "linkedName": "CS"
+      "linkedName": null
     },
     {
       "anchor": {
-        "x": 2.466353430443504,
-        "y": 4.035
+        "x": 2.7869504310344833,
+        "y": 1.1713038793103454
       },
       "prevControl": {
-        "x": 2.8661138548171126,
-        "y": 4.043057554073772
+        "x": 2.7869504310344833,
+        "y": 2.823060344827586
       },
       "nextControl": null,
       "isLocked": false,
-      "linkedName": "C-Shoot"
+      "linkedName": null
     }
   ],
   "rotationTargets": [],
@@ -33,8 +33,8 @@
   "pointTowardsZones": [],
   "eventMarkers": [],
   "globalConstraints": {
-    "maxVelocity": 1.0,
-    "maxAcceleration": 1.0,
+    "maxVelocity": 5.2,
+    "maxAcceleration": 3.0,
     "maxAngularVelocity": 270.0,
     "maxAngularAcceleration": 270.0,
     "nominalVoltage": 12.0,
@@ -50,5 +50,5 @@
     "velocity": 0,
     "rotation": 0.0
   },
-  "useDefaultConstraints": false
+  "useDefaultConstraints": true
 }
