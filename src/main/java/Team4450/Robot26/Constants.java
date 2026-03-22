@@ -67,14 +67,15 @@ public final class Constants {
 
     public static int SHOOTER_UPPER_BEAM_BREAK_PORT = 3;
 
-    public static int SHOOTER_FLYWHEEL_CURRENT_LIMIT = 35;
+    public static int SHOOTER_FLYWHEEL_CURRENT_LIMIT = 65; //35 Amps
     public static int SHOOTER_INFEED_CURRENT_LIMIT = 35;
     public static int SHOOTER_HOOD_CURRENT_LIMIT = 5;
     public static int INTAKE_CURRENT_LIMIT = 20;
     public static int INTAKE_PIVIT_CURRENT_LIMIT = 5;
-    public static int HOPPER_CURRENT_LIMIT = 40;
+    public static int HOPPER_CURRENT_LIMIT = 40; 
 
-    public static double HOOD_TOLERENCE_MOTOR_ROTATIONS = 0.02;
+
+    public static double HOOD_TOLERENCE_MOTOR_ROTATIONS = 0.02; 
     public static double HOOD_TOLERENCE_DEGREES = 5;
     public static double HOOD_GEAR_RATIO = 3.0/8.0;
     public static double HOOD_DOWN_ANGLE_DEGREES = 15;
@@ -220,6 +221,8 @@ public final class Constants {
 
     // Hopper motor constants
     public static final int HOPPER_MOTOR_CAN_ID = 12; // Example CAN ID for the Kraken X60 motor
+    // If you added a second motor to the hopper (moved from hood), set its CAN ID here.
+    public static final int HOPPER_MOTOR_SECOND_CAN_ID = 18;
 
     public static final int INTAKE_DEFAULT_TARGET_RPM = 4000;
     // PID constants for Intake

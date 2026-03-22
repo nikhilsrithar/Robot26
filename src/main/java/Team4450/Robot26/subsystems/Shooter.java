@@ -36,8 +36,6 @@ public class Shooter extends SubsystemBase {
     private final LinkedMotors flywheelMotors = new LinkedMotors(flywheelMotorTopLeft, flywheelMotorTopRight, flywheelMotorBottomLeft, flywheelMotorBottomRight);
     // This motor is a Kraken x60
     private final TalonFX hoodLeft = new TalonFX(Constants.HOOD_MOTOR_LEFT_CAN_ID, new CANBus(Constants.CANIVORE_NAME));
-    // This motor is a Kraken x60
-    private final TalonFX hoodRight = new TalonFX(Constants.HOOD_MOTOR_RIGHT_CAN_ID, new CANBus(Constants.CANIVORE_NAME));
     // This motor is a Kraken x44
     private final TalonFX infeedMotorLeft = new TalonFX(Constants.INFEED_MOTOR_LEFT_CAN_ID, new CANBus(Constants.CANIVORE_NAME));
     // This motor is a Kraken x44
@@ -91,8 +89,9 @@ public class Shooter extends SubsystemBase {
     public Shooter(Drivebase drivebase) {
         this.drivebase = drivebase;
 
-        this.canFlywheel = flywheelMotorTopLeft.isConnected() && flywheelMotorTopRight.isConnected() && flywheelMotorBottomLeft.isConnected() && flywheelMotorBottomRight.isConnected();
-        this.canHood = hoodLeft.isConnected() && hoodRight.isConnected();
+    this.canFlywheel = flywheelMotorTopLeft.isConnected() && flywheelMotorTopRight.isConnected() && flywheelMotorBottomLeft.isConnected() && flywheelMotorBottomRight.isConnected();
+    // Hood now runs from a single motor (hoodLeft). hoodRight was moved to the hopper (CAN ID 18).
+    this.canHood = hoodLeft.isConnected();
         this.canInfeed = infeedMotorLeft.isConnected() && infeedMotorRight.isConnected();
 
         this.hoodMotorPosition = 0;
@@ -408,7 +407,6 @@ public class Shooter extends SubsystemBase {
         PositionVoltage req = new PositionVoltage(Math.min(pos, Constants.HOOD_ARC_TABLE[HOOD_ARC_TABLE.length - 1]));
 
         this.hoodLeft.setControl(req);
-        this.hoodRight.setControl(new Follower(this.hoodLeft.getDeviceID(), MotorAlignmentValue.Opposed));
     }
 
     public void startFlywheel() {
@@ -510,7 +508,7 @@ public class Shooter extends SubsystemBase {
     }
 
     public double getHoodCurrent() {
-        return hoodLeft.getSupplyCurrent(true).getValueAsDouble() + hoodRight.getSupplyCurrent(true).getValueAsDouble();
+        return hoodLeft.getSupplyCurrent(true).getValueAsDouble();
     }
 
     public double getHoodLeftMotorCurrent() {
@@ -518,7 +516,8 @@ public class Shooter extends SubsystemBase {
     }
 
     public double getHoodRightMotorCurrent() {
-        return hoodRight.getSupplyCurrent(true).getValueAsDouble();
+        // Right hood motor was moved to the hopper; no hoodRight motor present now.
+        return 0.0;
     }
 
     /**
@@ -662,7 +661,6 @@ public class Shooter extends SubsystemBase {
         hoodCFG.MotionMagic.MotionMagicJerk = Constants.HOOD_MOTION_JERK;
 
         this.hoodLeft.getConfigurator().apply(hoodCFG);
-        this.hoodRight.getConfigurator().apply(hoodCFG);
     }
 
     /**
