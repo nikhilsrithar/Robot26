@@ -1,6 +1,7 @@
 package Team4450.Robot26.commands;
 
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj2.command.Command;
 import java.util.function.DoubleSupplier;
 import edu.wpi.first.math.controller.PIDController;
@@ -8,6 +9,7 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import Team4450.Lib.Util;
 import Team4450.Robot26.Constants;
+import Team4450.Robot26.RobotContainer;
 import Team4450.Robot26.subsystems.Drivebase;
 import static Team4450.Robot26.Constants.*;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -63,6 +65,8 @@ public class DriveCommand extends Command {
 
         if (robot.isAutonomous()) return; // We do not want to run the drive command if we are in auto
 
+        // Somewhere in here for the pose estimate for the robot there is a problem where on the red side the robot seems to point to the left. There does not seem to be a problem with the blue side
+
         // This finds where the correct hub position is
         Pose2d hubPosition;
         if (alliance == DriverStation.Alliance.Blue) {
@@ -76,40 +80,66 @@ public class DriveCommand extends Command {
         // Decides where to track
         // If both inputs are zero and the alliance is blue then
         Pose2d drivebasePose = drivebase.getODPose();
-        if (Math.abs(rotationXSupplier.getAsDouble()) <= 0.2 && Math.abs(rotationYSupplier.getAsDouble()) <= 0.2 && alliance == DriverStation.Alliance.Blue) {
-            // Checks if robot is currently in the Alliance Zone then aims at the hub
-            if (drivebasePose.getX() < NEUTRAL_BLUE_ZONE_BARRIER_X) {
-                targetHeading = drivebase.getAngleToAim(drivebasePose, hubPosition);
-            } else {
-                // Checks what side the robot is on, and aims at the nearest ferrying target point predefined in Constants
-                if (drivebasePose.getY() < FIELD_MIDDLE_Y) {
-                    targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_BLUE_OUTPOST_CORNER);
+
+        if (!drivebase.wallTrackingLeft && !drivebase.wallTrackingRight) {
+            if (Math.abs(rotationXSupplier.getAsDouble()) <= 0.2 && Math.abs(rotationYSupplier.getAsDouble()) <= 0.2 && alliance == DriverStation.Alliance.Blue) {
+                // Checks if robot is currently in the Alliance Zone then aims at the hub
+                if (drivebasePose.getX() < NEUTRAL_BLUE_ZONE_BARRIER_X) {
+                    targetHeading = drivebase.getAngleToAim(drivebasePose, hubPosition);
+                    RobotContainer.shooter.disableManualDistanceThree();
                 } else {
-                    targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_BLUE_BLANK_CORNER);
+                    // Checks what side the robot is on, and aims at the nearest ferrying target point predefined in Constants
+                    if (drivebasePose.getY() < FIELD_MIDDLE_Y) {
+                        RobotContainer.shooter.enableManualDistanceThree();
+                        RobotContainer.shooter.disableManualDistanceOne();
+                        RobotContainer.shooter.disableManualDistanceTwo();
+                        targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_BLUE_OUTPOST_CORNER);
+                    } else {
+                        RobotContainer.shooter.enableManualDistanceThree();
+                        RobotContainer.shooter.disableManualDistanceOne();
+                        RobotContainer.shooter.disableManualDistanceTwo();
+                        targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_BLUE_BLANK_CORNER);
+                    }
                 }
-            }
-            // This does the same thing but for the red alliance
-        } else if (Math.abs(rotationXSupplier.getAsDouble()) <= 0.2 && Math.abs(rotationYSupplier.getAsDouble()) <= 0.2 && alliance == DriverStation.Alliance.Red) {
-            if (drivebasePose.getX() > NEUTRAL_RED_ZONE_BARRIER_X) {
-                targetHeading = drivebase.getAngleToAim(drivebasePose, hubPosition);
-            } else {
-                if (drivebasePose.getY() < FIELD_MIDDLE_Y) {
-                    targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_RED_BLANK_CORNER);
+                // This does the same thing but for the red alliance
+            } else if (Math.abs(rotationXSupplier.getAsDouble()) <= 0.2 && Math.abs(rotationYSupplier.getAsDouble()) <= 0.2 && alliance == DriverStation.Alliance.Red) {
+                if (drivebasePose.getX() > NEUTRAL_RED_ZONE_BARRIER_X) {
+                    targetHeading = drivebase.getAngleToAim(drivebasePose, hubPosition);
+                    RobotContainer.shooter.disableManualDistanceThree();
                 } else {
-                    targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_RED_OUTPOST_CORNER);
+                    if (drivebasePose.getY() < FIELD_MIDDLE_Y) {
+                        RobotContainer.shooter.enableManualDistanceThree();
+                        RobotContainer.shooter.disableManualDistanceOne();
+                        RobotContainer.shooter.disableManualDistanceTwo();
+                        targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_RED_BLANK_CORNER);
+                    } else {
+                        RobotContainer.shooter.enableManualDistanceThree();
+                        RobotContainer.shooter.disableManualDistanceOne();
+                        RobotContainer.shooter.disableManualDistanceTwo();
+                        targetHeading = drivebase.getAngleToAim(drivebasePose, FERRY_RED_OUTPOST_CORNER);
+                    }
                 }
+            } else {
+                targetHeading = drivebase.getAngleToAim(drivebasePose, hubPosition);
+                RobotContainer.shooter.disableManualDistanceThree();
             }
-            // If there IS input, set the target heading to where the joystick is facing in relation to the driver
         } else {
-            // targetHeading = -Math.toDegrees(Math.atan2(rotationYSupplier.getAsDouble(), rotationXSupplier.getAsDouble())) - 90;
-            targetHeading = drivebase.getAngleToAim(drivebasePose, hubPosition);
+            if (drivebase.wallTrackingLeft) {
+                targetHeading = -25;
+            } else if (drivebase.wallTrackingRight) {
+                targetHeading = 25;
+            } else {
+                targetHeading = drivebase.getAngleToAim(drivebasePose, hubPosition);
+                // targetHeading = -Math.toDegrees(Math.atan2(rotationYSupplier.getAsDouble(), rotationXSupplier.getAsDouble())) - 90;
+            }
         }
 
         targetHeading = normalizeAngle(targetHeading);
         SmartDashboard.putNumber(Constants.SmartDashboardKeys.TARGET_HEADING, targetHeading);
 
         double drivebaseYaw = drivebase.getODPose().getRotation().getDegrees();
-        SmartDashboard.putNumber("Heading Error", drivebaseYaw - targetHeading);
+        double headingError = drivebaseYaw - targetHeading;
+        SmartDashboard.putNumber("Heading Error", headingError);
 
         if (Constants.HUB_TRACKING) {
             // Uses a PID and the previous assigned target heading to rotate there
@@ -125,10 +155,22 @@ public class DriveCommand extends Command {
             headingPID.setI(SmartDashboard.getNumber(Constants.SmartDashboardKeys.HEADING_I, Constants.ROBOT_HEADING_KI));
             headingPID.setD(SmartDashboard.getNumber(Constants.SmartDashboardKeys.HEADING_D, Constants.ROBOT_HEADING_KD));
 
+            if (Math.abs(headingError) <= 5 || Math.abs(headingError) >= 355) {
+                RobotContainer.driverController.setRumble(RumbleType.kBothRumble, 0.3);
+                rotation = 0;
+                drivebase.setX();
+            } else {
+                RobotContainer.driverController.setRumble(RumbleType.kBothRumble, 0);
+            }
+
             drivebase.drive(throttle, strafe, rotation);
             return;
         } else {
+            RobotContainer.driverController.setRumble(RumbleType.kBothRumble, 0);
             double rotation = rotationXSupplier.getAsDouble();
+            if (rotation <= 0.1) {
+                rotation = rotation * 2;
+            }
             double throttle = throttleSupplier.getAsDouble();
             double strafe = strafeSupplier.getAsDouble();
 

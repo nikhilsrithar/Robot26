@@ -5,22 +5,21 @@
     "data": {
       "commands": [
         {
-          "type": "deadline",
+          "type": "path",
           "data": {
-            "commands": [
-              {
-                "type": "path",
-                "data": {
-                  "pathName": "CS-Shoot"
-                }
-              },
-              {
-                "type": "named",
-                "data": {
-                  "name": "startIntake"
-                }
-              }
-            ]
+            "pathName": "BS Park"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 0.25
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Center Park To Shoot"
           }
         },
         {
@@ -30,16 +29,28 @@
               {
                 "type": "wait",
                 "data": {
-                  "waitTime": 1.0
+                  "waitTime": 4.5
                 }
               },
               {
                 "type": "named",
                 "data": {
-                  "name": "stopIntake"
+                  "name": "lowHopperShoot"
+                }
+              },
+              {
+                "type": "named",
+                "data": {
+                  "name": "hubTrack"
                 }
               }
             ]
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Bump Shoot To Depot"
           }
         },
         {
@@ -49,13 +60,19 @@
               {
                 "type": "wait",
                 "data": {
-                  "waitTime": 7.0
+                  "waitTime": 4.5
                 }
               },
               {
                 "type": "named",
                 "data": {
-                  "name": "shoot"
+                  "name": "lowHopperShoot"
+                }
+              },
+              {
+                "type": "named",
+                "data": {
+                  "name": "hubTrack"
                 }
               }
             ]

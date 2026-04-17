@@ -2,6 +2,8 @@ package Team4450.Robot26.subsystems;
 
 import static Team4450.Robot26.Constants.DriveConstants.*;
 
+import org.opencv.core.Mat;
+
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest.ForwardPerspectiveValue;
 import com.pathplanner.lib.auto.AutoBuilder;
@@ -62,16 +64,19 @@ public class Drivebase extends SubsystemBase {
   // to control what is displayed (the simulated robot).
   private final Field2d field2d = new Field2d();
 
-  private boolean overrideQuestForRobotPose = false;
   private boolean fieldRelativeDriving = true, slowMode = false;
   private boolean neutralModeBrake = true;
   private double maxSpeed = kMaxSpeed * kDriveReductionPct;
   private double maxRotRate = kMaxAngularRate * kRotationReductionPct;
   private boolean driverControlled = true;
+  private boolean bumpHappened = true;
 
   private double lastThrottle = 0;
   private double lastStrafe = 0;
   private double lastRotation = 0;
+
+  public boolean wallTrackingLeft = false;
+  public boolean wallTrackingRight = false;
 
   private final SwerveRequest.FieldCentric driveField = new SwerveRequest.FieldCentric()
       .withDeadband(kMaxSpeed * DRIVE_DEADBAND)
@@ -85,9 +90,6 @@ public class Drivebase extends SubsystemBase {
 
   public Drivebase() {
     Util.consoleLog();
-
-        this.overrideQuestForRobotPose = false;
-        SmartDashboard.putBoolean(Constants.SmartDashboardKeys.OVERRIDE_QUEST_FOR_ROBOT_POSE, this.overrideQuestForRobotPose);
 
         // Add pigeon gyro as a Sendable. Updates the dashboard heading indicator
         // automatically.
@@ -113,6 +115,7 @@ public class Drivebase extends SubsystemBase {
         sdsDrivebase.applyRequest(() -> idle).ignoringDisable(true));
 
         // Updates the dashboard heading indicator automatically.
+        // Can I remove this?
         SmartDashboard.putData(Constants.SmartDashboardKeys.FIELD2D, field2d);
 
     // At some point move this to teleop init if it can be done quickly because
@@ -149,13 +152,33 @@ public class Drivebase extends SubsystemBase {
     updateModulePoses(sdsDrivebase);
 
     SmartDashboard.putString(Constants.SmartDashboardKeys.ROBOT_POSE, getPose().toString());
+    SmartDashboard.putBoolean(Constants.SmartDashboardKeys.HUB_TRACKING, Constants.HUB_TRACKING);
+    SmartDashboard.putBoolean(Constants.SmartDashboardKeys.BUMP_HAPPENED, this.bumpHappened);
+
+    Pose2d drivebasePose = getPose();
+    if (Math.abs(drivebasePose.getX()) > Constants.FIELD_MAX_X || Math.abs(drivebasePose.getY()) > Constants.FIELD_MAX_Y) {
+        SmartDashboard.putBoolean(Constants.SmartDashboardKeys.OUTSIDE_FIELD, true);
+    } else {
+        SmartDashboard.putBoolean(Constants.SmartDashboardKeys.OUTSIDE_FIELD, false);
+    }
+
+
+    if (SmartDashboard.getNumber(Constants.SmartDashboardKeys.ROBOT_DISTANCE, 0) > 1.25 && SmartDashboard.getNumber(Constants.SmartDashboardKeys.ROBOT_DISTANCE, 0) < 1.75) {
+        SmartDashboard.putBoolean(Constants.SmartDashboardKeys.DISTANCE_BOX, true);
+    } else {
+        SmartDashboard.putBoolean(Constants.SmartDashboardKeys.DISTANCE_BOX, false);
+    }
+
+    SmartDashboard.putNumber(Constants.SmartDashboardKeys.BATTERY_VOLTAGE, RobotController.getBatteryVoltage());
+
     if (RobotContainer.inTestMode) {
         SmartDashboard.putNumber(Constants.SmartDashboardKeys.Gyro_HEADING, pigeonWrapper.startingYaw);
         SmartDashboard.putNumber(Constants.SmartDashboardKeys.GYRO_STARTING_YAW, pigeonWrapper.getHeading());
-        SmartDashboard.putNumber(Constants.SmartDashboardKeys.BATTERY_VOLTAGE, RobotController.getBatteryVoltage());
         SmartDashboard.putString(Constants.SmartDashboardKeys.ROBOT_OD_POSE, getODPose().toString());
         SmartDashboard.putNumber(Constants.SmartDashboardKeys.DRIVEBASE_CURRENT, getDrivetrainCurrent());
         SmartDashboard.putString(Constants.SmartDashboardKeys.LIMELIGHT_POSE, this.limelightPoseEstimate.toString());
+        SmartDashboard.putNumber("Flywheel Error", RobotContainer.shooter.flywheelRPMError);
+        
     }
   }
 
@@ -351,15 +374,6 @@ public class Drivebase extends SubsystemBase {
      * @return Robot pose.
      */
     public Pose2d getPose() {
-        // if (RobotContainer.questNavSubsystem.hasQuest()
-        //         || SmartDashboard.getBoolean("overrideQuestForRobotPose", this.overrideQuestForRobotPose)) {
-        //     SmartDashboard.putBoolean("Trying to send current robotPose", true);
-        //     return new Pose2d(robotPose.getX(), robotPose.getY(),
-        //             new Rotation2d(Math.toRadians(pigeonWrapper.getYaw180())));
-        // } else {
-        //     SmartDashboard.putBoolean("Trying to send current robotPose", false);
-        //     return new Pose2d(0, 0, new Rotation2d(0));
-        // }
         return getODPose();
     }
 
@@ -371,6 +385,10 @@ public class Drivebase extends SubsystemBase {
   // Get the sds ordometry x velocity in meters per second
   public double getXVelocity() {
     return sdsDrivebase.getStateCopy().Speeds.vxMetersPerSecond;
+  }
+
+  public double getTotalVelocity() {
+      return Math.sqrt(Math.pow(getXVelocity(), 2) + Math.pow(getYVelocity(), 2));
   }
 
   // Get the sds ordometry y velocity in meters per second
@@ -406,30 +424,28 @@ public class Drivebase extends SubsystemBase {
     SmartDashboard.putBoolean(Constants.SmartDashboardKeys.FIELD_ORIENTED, fieldRelativeDriving);
   }
 
-  public void addQuestMeasurement(Pose2d pose, double timestampSeconds) {
-    robotPose = pose;
-  }
-
-  // This is for when the Questnav is not found.
-  public void forceAddLimelightMeasurement(Pose2d pose) {
-    robotPose = pose;
-  }
-
   //
   public void addLimelightMeasurement(Pose2d pose, double timestampSeconds) {
-    // TODO: All the stuff below this
-    // Use the visionBuffer
-    // Truncate vision buffer
-    // Append current vision measurement
-    // Replay vision poses
-    // Remove any vision poses the break the laws of physics
-
-    // Basic vision update that just sets the pose, this is good enough for testing
-    // if it is working
     this.limelightPoseEstimate = pose;
+    Pose2d drivebasePose = getPose();
+
+    if (Math.abs(drivebasePose.getX()) > Constants.FIELD_MAX_X || Math.abs(drivebasePose.getY()) > Constants.FIELD_MAX_Y) {
+        resetOdometry(pose);
+    }
+
+    if (this.bumpHappened) {
+        resetOdometry(pose);
+        this.bumpHappened = false;
+    }
+
     this.sdsDrivebase.addVisionMeasurement(pose, timestampSeconds);
   }
 
+
+  public void addQuestPose(Pose2d pose, double timestampSeconds) {
+
+      this.sdsDrivebase.addVisionMeasurement(pose, timestampSeconds);
+  }
   /**
    * This function converts an ideal target position into an angle for the robot
    * to face accounting for velocity
@@ -501,7 +517,7 @@ public class Drivebase extends SubsystemBase {
           modules[i].getCurrentState().angle.plus(Rotation2d.fromDegrees(-getYaw180())));
     }
 
-    field2d.getObject("Robot").setPose(robotPose);
+    field2d.getObject("Robot").setPose(new Pose2d(robotPose.getX(), robotPose.getY(), new Rotation2d(Math.toRadians(robotPose.getRotation().getRadians()))));
     field2d.getObject("Swerve Modules").setPoses(modulePoses);
   }
 
@@ -543,5 +559,22 @@ public class Drivebase extends SubsystemBase {
 
   public ChassisSpeeds getSpeeds() {
     return sdsDrivebase.getSpeeds();
+  }
+
+  public void setWallTrackingLeft() {
+      this.wallTrackingLeft = true;
+  }
+
+  public void setWallTrackingRight() {
+      this.wallTrackingRight = true;
+  }
+
+  public void clearWallTacking() {
+      this.wallTrackingLeft = false;
+      this.wallTrackingRight = false;
+  }
+
+  public void setBumpHappened() {
+      this.bumpHappened = true;
   }
 }

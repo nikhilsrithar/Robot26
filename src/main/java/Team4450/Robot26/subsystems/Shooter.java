@@ -16,6 +16,7 @@ import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -59,6 +60,7 @@ public class Shooter extends SubsystemBase {
     public boolean driverEnabledInfeed = false;
 
     DigitalInput beamBreak;
+    private Timer beamBreakTimer;
 
     // Constants for launch calculations
     private static final double GRAVITY = 9.81;
@@ -68,9 +70,11 @@ public class Shooter extends SubsystemBase {
     private static final double CONVERSION_FACTOR_MPS_TO_RPM = 10000 / 47.93;
 
     private double targetRPM = Constants.FLYWHEEL_TARGET_RPM;
+    public double flywheelRPMError = 0;
     private double currentRPM = 0.0;
 
     public boolean flywheelEnabled = false; // Button-controlled enable
+    public boolean slowAcceleration = false; // Slows the acceleration of the flywheel so that it will only reach speed as the next fuel reaches the flywheel and not before to minimise voltage draw
 
     // Shuffleboard cached values
     private boolean sdInit = false;
@@ -79,6 +83,7 @@ public class Shooter extends SubsystemBase {
     private boolean manualDistanceOne = false;
     private boolean manualDistanceTwo = false;
     private boolean manualDistanceThree = false;
+    private boolean manualDistanceFour = false;
 
     private boolean enabledHood = false;
 
@@ -99,7 +104,10 @@ public class Shooter extends SubsystemBase {
 
         this.hoodRotationOffset = this.hoodLeft.getPosition(true).getValueAsDouble();
 
+        this.beamBreakTimer = new Timer();
+
         beamBreak = new DigitalInput(Constants.SHOOTER_UPPER_BEAM_BREAK_PORT);
+        beamBreakTimer.start();
 
         applyFlywheelConfig(
             Constants.FLYWHEEL_kP, Constants.FLYWHEEL_kI, Constants.FLYWHEEL_kD,
@@ -135,25 +143,25 @@ public class Shooter extends SubsystemBase {
 
         sdInit = true;
 
-        SmartDashboard.putNumber(Constants.SmartDashboardKeys.HOOD_POWER, 0.05);
         SmartDashboard.putNumber(Constants.SmartDashboardKeys.INFEED_TARGET_RPM, Constants.INFEED_DEFAULT_TARGET_RPM);
         SmartDashboard.putBoolean(Constants.SmartDashboardKeys.DISABLE_AUTO_FLYWHEEL_UPDATE, this.disableAutomaticFlywheelUpdate);
         SmartDashboard.putBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_ONE, this.manualDistanceOne);
         SmartDashboard.putBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_TWO, this.manualDistanceTwo);
         SmartDashboard.putBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_THREE, this.manualDistanceThree);
+        SmartDashboard.putBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_FOUR, this.manualDistanceFour);
 
         this.enabledHood = false;
     }
 
     @Override
     public void periodic() {
-        // Flywheel is controlled by TestSubsystem via Constants; no dashboard reads here.
-        
         // This line should be all that is needed when the flywheel should be spun up
         updateLaunchValues(true);
 
         // Update the beam break sensors
         SmartDashboard.putBoolean(Constants.SmartDashboardKeys.BEAM_BREAK, beamBreak.get());
+
+        if(!beamBreak.get()) beamBreakTimer.reset();
 
         hoodMotorPosition = hoodLeft.getPosition().getValueAsDouble();
 
@@ -205,12 +213,15 @@ public class Shooter extends SubsystemBase {
 
         targetRPM = SmartDashboard.getNumber(Constants.SmartDashboardKeys.FLYWHEEL_TARGET_RPM, 0);
 
+        flywheelRPMError = targetRPM - currentRPM;
+
         double targetRPS;
 
         if (flywheelEnabled && canFlywheel) {
             targetRPS = targetRPM / 60.0;
-            MotionMagicVelocityVoltage req =
-                    new MotionMagicVelocityVoltage(targetRPS)
+            SmartDashboard.putNumber("Target Flywheel RPS", targetRPS);
+
+            MotionMagicVelocityVoltage req = new MotionMagicVelocityVoltage(targetRPS)
                             .withSlot(Constants.FLYWHEEL_PID_SLOT).withEnableFOC(true);
 
             this.flywheelMotorTopLeft.setControl(req);
@@ -245,11 +256,13 @@ public class Shooter extends SubsystemBase {
     public void updateLaunchValues(boolean interpolate) {
         double distToGoal = 0;
         if (SmartDashboard.getBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_ONE, this.manualDistanceOne)) {
-            distToGoal = 2.5;
-        } else if (SmartDashboard.getBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_TWO, this.manualDistanceTwo)) {
-            distToGoal = 4.5;
-        } else if (SmartDashboard.getBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_THREE, this.manualDistanceThree)) {
             distToGoal = 1.5;
+        } else if (SmartDashboard.getBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_TWO, this.manualDistanceTwo)) {
+            distToGoal = 2.5;
+        } else if (SmartDashboard.getBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_THREE, this.manualDistanceThree)) {
+            distToGoal = 5.5;
+        } else if (SmartDashboard.getBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_FOUR, this.manualDistanceFour)) {
+            distToGoal = 4;
         } else {
             // Calculate distance to goal & diffs
             Pose2d goalPose = (getGoalPose());
@@ -258,8 +271,6 @@ public class Shooter extends SubsystemBase {
             distToGoal = Math.sqrt(Math.pow(xDiff, 2) + Math.pow(yDiff, 2));
         }
 
-        SmartDashboard.putNumber(Constants.SmartDashboardKeys.ROBOT_LAUNCH_X, drivebase.getPose().getX());
-        SmartDashboard.putNumber(Constants.SmartDashboardKeys.ROBOT_LAUNCH_Y, drivebase.getPose().getY());
         SmartDashboard.putString(Constants.SmartDashboardKeys.GOAL_POSE, getGoalPose().toString());
         SmartDashboard.putNumber(Constants.SmartDashboardKeys.ROBOT_DISTANCE, distToGoal);
 
@@ -291,6 +302,12 @@ public class Shooter extends SubsystemBase {
         this.manualDistanceThree = !this.manualDistanceThree;
         SmartDashboard.putBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_THREE, this.manualDistanceThree);
     }
+    
+    public void toggleManaualDistanceFour() {
+        this.manualDistanceFour = SmartDashboard.getBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_FOUR, this.manualDistanceFour);
+        this.manualDistanceFour = !this.manualDistanceFour;
+        SmartDashboard.putBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_FOUR, this.manualDistanceFour);
+    }
 
     public void disableManualDistanceOne() {
         SmartDashboard.putBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_ONE, false);
@@ -316,18 +333,34 @@ public class Shooter extends SubsystemBase {
         SmartDashboard.putBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_THREE, true);
     }
 
+    public void disableManualDistanceFour() {
+        SmartDashboard.putBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_FOUR, false);
+    }
+
+    public void enableManualDistanceFour() {
+        SmartDashboard.putBoolean(Constants.SmartDashboardKeys.MANUAL_DISTANCE_FOUR, true);
+    }
+
     public boolean flywheelAtSpeed() {
         // Change tolerence to a constant at some point
-        if (Math.abs(this.currentRPM - this.targetRPM) < 300) {
+        if (Math.abs(this.currentRPM - this.targetRPM) < 50) {
             return true;
         } else {
             return false;
         }
     }
 
+    public boolean flywheelTooLow() {
+        if (Math.abs(this.currentRPM - this.targetRPM) < 500) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
     public boolean flywheelWithinSpeed() {
         // Change tolerence to a constant at some point
-        if (Math.abs(this.currentRPM - this.targetRPM) < 400) {
+        if (Math.abs(this.currentRPM - this.targetRPM) < 150) {
             return true;
         } else {
             return false;
@@ -501,6 +534,10 @@ public class Shooter extends SubsystemBase {
             this.infeedMotorLeft.set(0);
             this.infeedMotorRight.setControl(new Follower(this.infeedMotorLeft.getDeviceID(), MotorAlignmentValue.Opposed));
         }
+    }
+
+    public void farFerry() {
+        updateHoodPosition(2.85);
     }
 
     public double getInfeedRPM() {

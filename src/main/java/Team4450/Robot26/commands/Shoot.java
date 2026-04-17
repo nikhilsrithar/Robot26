@@ -6,56 +6,89 @@ import Team4450.Robot26.subsystems.Shooter;
 import Team4450.Robot26.subsystems.Intake;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import Team4450.Robot26.Constants;
 
 public class Shoot extends Command {
-  private Shooter shooter;
-  private Hopper hopper;
-  private Drivebase drivebase;
-  private Intake intake;
-  private Timer timer;
+    private Shooter shooter;
+    private Hopper hopper;
+    private Drivebase drivebase;
+    private Intake intake;
+    private Timer pviotIncrementTimer;
+    private Timer pivotDelay;
+    private Timer xTimer;
+    private Timer infeedDelay;
+    private boolean temp;
 
-  public Shoot(Drivebase drivebase, Shooter shooter, Hopper hopper, Intake intake) {
-    this.shooter = shooter;
-    this.hopper = hopper;
-    this.drivebase = drivebase;
-    this.intake = intake;
-    this.timer = new Timer();
-  }
+    public Shoot(Drivebase drivebase, Shooter shooter, Hopper hopper, Intake intake) {
+        this.shooter = shooter;
+        this.hopper = hopper;
+        this.drivebase = drivebase;
+        this.intake = intake;
+        this.pivotDelay = new Timer();
+        this.pviotIncrementTimer = new Timer();
+        this.xTimer = new Timer();
+        this.infeedDelay = new Timer();
+    }
 
     @Override
     public void initialize() {
         shooter.enabledHood();
         shooter.startFlywheel();
         drivebase.setX();
-        timer.start();
-        timer.reset();
-        intake.shootingPivitToggle();
+        pviotIncrementTimer.start();
+        pviotIncrementTimer.reset();
+        pivotDelay.start();
+        pivotDelay.reset();
+        xTimer.start();
+        xTimer.reset();
+        intake.slowIntake();
+        intake.pivitDown();
+        infeedDelay.start();
+        infeedDelay.reset();
+        drivebase.enabledSlowMode();
     }
 
     @Override
     public void execute() {
-        drivebase.setX();
+        if (this.xTimer.hasElapsed(0.5)) {
+            drivebase.setX();
+            this.xTimer.reset();
+        }
+
         if (this.shooter.flywheelAtSpeed()) {
+            if (!temp) {
+                infeedDelay.reset();
+                temp = true;
+            }
+            if (infeedDelay.hasElapsed(0.2)) {
+                hopper.start();
+            }
             shooter.startInfeed();
-            hopper.start();
+        }
+
+        if (this.shooter.flywheelTooLow()) {
+            shooter.stopInfeed();
+        } else {
+            shooter.startInfeed();
         }
 
         if (!this.shooter.flywheelWithinSpeed()) {
-            shooter.stopInfeed();
+            SmartDashboard.putNumber(Constants.SmartDashboardKeys.INFEED_TARGET_RPM, (Constants.INFEED_DEFAULT_TARGET_RPM - Math.max(shooter.flywheelRPMError * 5, 0)));
         }
 
-        if(timer.hasElapsed(0.5)){
-          intake.shootingPivitToggle();
-          timer.reset();
+        if (pivotDelay.hasElapsed(1) && pviotIncrementTimer.hasElapsed(0.3) && SmartDashboard.getNumber(Constants.SmartDashboardKeys.PIVOT_POSITION, 0) > 0.1) {
+            intake.incrementPivitUp(0.05);
+            pviotIncrementTimer.reset();
+            
         }
-        
     }
 
-  @Override
-  public boolean isFinished() {
-    // We will always force stop the command
-    return false;
-  }
+    @Override
+    public boolean isFinished() {
+        // We will always force stop the command
+        return false;
+    }
 
     @Override
     public void end(boolean interuppted) {
@@ -63,6 +96,8 @@ public class Shoot extends Command {
         shooter.stopFlywheel();
         shooter.stopInfeed();
         hopper.stop();
-        
+        intake.pivitDown();
+        intake.stopIntake();
+        drivebase.disableSlowMode();
     }
 }

@@ -11,6 +11,8 @@ import java.lang.Math;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import Team4450.Robot26.RobotContainer;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 
 public class VisionSubsystem extends SubsystemBase {
     // Info from: https://docs.limelightvision.io/docs/docs-limelight/pipeline-apriltag/apriltags
@@ -49,6 +51,8 @@ public class VisionSubsystem extends SubsystemBase {
         this.drivebase = drivebase;
         RobotOrientation rO = drivebase.getRobotOrientation(); // IDK if RobotOrientation works correctly, look there to see
                                                                
+        LimelightHelpers.setRewindEnabled(Constants.LIMELIGHT_FRONT, true);
+        LimelightHelpers.setRewindEnabled(Constants.LIMELIGHT_RIGHT, true);
 
         // Quick notes on the rotation 3d getX() return the roll in radians, getY() return the pitch in radians, getZ() return the yaw in radians
 
@@ -116,20 +120,18 @@ public class VisionSubsystem extends SubsystemBase {
 
             double numTags = front_mt2.rawFiducials.length;
             for (LimelightHelpers.RawFiducial tag : front_mt2.rawFiducials) {
-                if (Math.abs(tag.txnc) > 15) { // TODO: Convert 20 to a constants value
+                if (Math.abs(tag.txnc) > Constants.LIMELIGHT_TXNC_LIMIT) {
                     numTags--;
-                } else if (Math.abs(tag.tync) > 15) {
+                } else if (Math.abs(tag.tync) > Constants.LIMELIGHT_TYNC_LIMIT) {
                     numTags--;
                 }
             }
 
-            // TODO: Convert to a constants value
-            if (numTags < 2) {
+            if (numTags < Constants.LIMELIGHT_TAG_LIMIT) {
                 useFrontLimelight = false;
             }
 
-            // TODO: Convert these to constants
-            if (Math.abs(drivebase.getXVelocity()) > 0.1 || Math.abs(drivebase.getYVelocity()) > 0.1 || Math.abs(drivebase.getRotVelocity()) > 0.1) {
+            if (Math.abs(drivebase.getXVelocity()) > Constants.LIMELIGHT_X_VELOCITY_LIMIT || Math.abs(drivebase.getYVelocity()) > Constants.LIMELIGHT_Y_VELOCITY_LIMIT || Math.abs(drivebase.getRotVelocity()) > Constants.LIMELIGHT_ROT_VELOCITY_LIMIT) {
                 useFrontLimelight = false;
             }
 
@@ -154,18 +156,18 @@ public class VisionSubsystem extends SubsystemBase {
 
             double numTags = right_mt2.rawFiducials.length;
             for (LimelightHelpers.RawFiducial tag : right_mt2.rawFiducials) {
-                if (Math.abs(tag.txnc) > 15) { // TODO: Convert 20 to a constants value
+                if (Math.abs(tag.txnc) > Constants.LIMELIGHT_TXNC_LIMIT) { // TODO: Convert 20 to a constants value
                     numTags--;
-                } else if (Math.abs(tag.tync) > 15) {
+                } else if (Math.abs(tag.tync) > Constants.LIMELIGHT_TYNC_LIMIT) {
                     numTags--;
                 }
             }
 
-            if (numTags < 2) {
+            if (numTags < Constants.LIMELIGHT_TAG_LIMIT) {
                 useRightLimelight = false;
             }
 
-            if (Math.abs(drivebase.getXVelocity()) > 0.1 || Math.abs(drivebase.getYVelocity()) > 0.1 || Math.abs(drivebase.getRotVelocity()) > 0.1) {
+            if (Math.abs(drivebase.getXVelocity()) > Constants.LIMELIGHT_X_VELOCITY_LIMIT || Math.abs(drivebase.getYVelocity()) > Constants.LIMELIGHT_Y_VELOCITY_LIMIT || Math.abs(drivebase.getRotVelocity()) > Constants.LIMELIGHT_ROT_VELOCITY_LIMIT) {
                 useRightLimelight = false;
             }
 
@@ -195,5 +197,19 @@ public class VisionSubsystem extends SubsystemBase {
         
         LimelightHelpers.SetRobotOrientation(Constants.LIMELIGHT_FRONT, rO.yaw, rO.yawRate, rO.pitch, rO.pitchRate, rO.roll, rO.rollRate);
         LimelightHelpers.SetRobotOrientation(Constants.LIMELIGHT_RIGHT, rO.yaw, rO.yawRate, rO.pitch, rO.pitchRate, rO.roll, rO.rollRate);
+    }
+
+    public Command recordAuto() {
+        return Commands.runOnce(() -> {
+            LimelightHelpers.triggerRewindCapture(Constants.LIMELIGHT_FRONT, 20);
+            LimelightHelpers.triggerRewindCapture(Constants.LIMELIGHT_RIGHT, 20);
+        });
+    }
+
+    public Command recordTeleop() {
+        return Commands.runOnce(() -> {
+            LimelightHelpers.triggerRewindCapture(Constants.LIMELIGHT_FRONT, 165);
+            LimelightHelpers.triggerRewindCapture(Constants.LIMELIGHT_RIGHT, 165);
+        });
     }
 }

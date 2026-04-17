@@ -9,7 +9,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import Team4450.Robot26.Constants;
 
-public class ShootWithX extends Command {
+public class LowHopperShoot extends Command {
     private Shooter shooter;
     private Hopper hopper;
     private Drivebase drivebase;
@@ -20,7 +20,7 @@ public class ShootWithX extends Command {
     private Timer infeedDelay;
     private boolean temp;
 
-    public ShootWithX(Drivebase drivebase, Shooter shooter, Hopper hopper, Intake intake) {
+    public LowHopperShoot(Drivebase drivebase, Shooter shooter, Hopper hopper, Intake intake) {
         this.shooter = shooter;
         this.hopper = hopper;
         this.drivebase = drivebase;
@@ -45,7 +45,6 @@ public class ShootWithX extends Command {
         intake.slowIntake();
         infeedDelay.start();
         infeedDelay.reset();
-        drivebase.setX();
     }
 
     @Override
@@ -66,17 +65,11 @@ public class ShootWithX extends Command {
             shooter.startInfeed();
         }
 
-        if (this.shooter.flywheelTooLow()) {
-            shooter.stopInfeed();
-        } else {
-            shooter.startInfeed();
-        }
-
         if (!this.shooter.flywheelWithinSpeed()) {
             SmartDashboard.putNumber(Constants.SmartDashboardKeys.INFEED_TARGET_RPM, (Constants.INFEED_DEFAULT_TARGET_RPM - Math.max(shooter.flywheelRPMError * 5, 0)));
         }
 
-        if (pivotDelay.hasElapsed(1) && pviotIncrementTimer.hasElapsed(0.15) && SmartDashboard.getNumber(Constants.SmartDashboardKeys.PIVOT_POSITION, 0) > 0.1) {
+        if (pivotDelay.hasElapsed(1) && pviotIncrementTimer.hasElapsed(0.10) && SmartDashboard.getNumber(Constants.SmartDashboardKeys.PIVOT_POSITION, 0) > 0.1) {
             intake.incrementPivitUp(0.05);
             pviotIncrementTimer.reset();
             
@@ -97,7 +90,6 @@ public class ShootWithX extends Command {
         hopper.stop();
         intake.pivitDown();
         intake.stopIntake();
-        drivebase.drive(0, 0, 0);
         
     }
 }
